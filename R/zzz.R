@@ -10,7 +10,11 @@
     teal.reporter.nav_buttons = c("preview", "download", "load", "reset"),
     teal.show_src = TRUE,
     teal.snapshot_manager.enable = TRUE,
-    teal.bs_theme = .default_teal_bslib_theming
+    teal.bs_theme = .default_teal_bslib_theming,
+    # Lazy module UI: when TRUE, non-active module UIs are rendered only on first activation
+    # (server-side renderUI) rather than eagerly at app startup. Reduces initial DOM size for
+    # apps with many modules. Default FALSE for backwards compatibility.
+    teal.lazy_module_ui = FALSE
   )
 
   op <- options()

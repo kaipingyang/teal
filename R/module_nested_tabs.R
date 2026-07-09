@@ -28,6 +28,14 @@
 #' one can run at any given time. This makes the app more efficient by reducing unnecessary
 #' computations on server side.
 #'
+#' ### Lazy module UI (`teal.lazy_module_ui` option)
+#'
+#' When `options(teal.lazy_module_ui = TRUE)`, non-active module UIs are not rendered eagerly at
+#' app startup. Instead, a lightweight `shiny::uiOutput` placeholder is inserted, and the real
+#' module UI is injected via `renderUI` the first time a user activates that module. This reduces
+#' the initial DOM size for apps with many modules (e.g. 30+ modules), improving first-load
+#' performance. The default is `FALSE` for backwards compatibility.
+#'
 #' @name module_teal_module
 #'
 #' @inheritParams module_teal
@@ -236,6 +244,16 @@ srv_teal_module <- function(id,
 .ui_teal_module.teal_module <- function(id, modules, active_module_id) {
   ns <- NS(id)
   args <- c(list(id = ns("module")), modules$ui_args)
+  lazy_ui <- isTRUE(getOption("teal.lazy_module_ui", FALSE))
+  is_active_module <- identical(modules$path, active_module_id)
+
+  module_content <- if (lazy_ui && !is_active_module) {
+    # Non-active modules: placeholder only; real UI injected server-side on first activation.
+    uiOutput(ns("lazy_ui"))
+  } else {
+    do.call(what = modules$ui, args = args, quote = TRUE)
+  }
+
   ui_teal <- tags$div(
     shinyjs::hidden(
       tags$div(
@@ -253,7 +271,7 @@ srv_teal_module <- function(id,
         class = "teal_validated",
         ui_check_module_datanames(ns("validate_datanames"))
       ),
-      do.call(what = modules$ui, args = args, quote = TRUE)
+      module_content
     )
   )
   container_id <- ns("wrapper")
@@ -479,6 +497,12 @@ srv_teal_module <- function(id,
     srv_module_filter_manager(modules$label, module_fd = datasets, slices_global = slices_global)
 
     .call_once_when(is_active(), {
+      # Lazy UI: inject real module UI on first activation (only when option is enabled).
+      if (isTRUE(getOption("teal.lazy_module_ui", FALSE))) {
+        args <- c(list(id = session$ns("module")), modules$ui_args)
+        output$lazy_ui <- renderUI(do.call(what = modules$ui, args = args, quote = TRUE))
+      }
+
       filtered_teal_data <- srv_filter_data(
         "filter_panel",
         datasets = datasets,
