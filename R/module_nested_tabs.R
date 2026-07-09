@@ -496,13 +496,18 @@ srv_teal_module <- function(id,
     #   and if it is not set, then it won't be available in the srv_filter_panel
     srv_module_filter_manager(modules$label, module_fd = datasets, slices_global = slices_global)
 
-    .call_once_when(is_active(), {
-      # Lazy UI: inject real module UI on first activation (only when option is enabled).
-      if (isTRUE(getOption("teal.lazy_module_ui", FALSE))) {
-        args <- c(list(id = session$ns("module")), modules$ui_args)
+    # Lazy UI: register renderUI outside .call_once_when so it fires as soon as
+    # the module is first activated, independent of data load status.
+    # The real module UI is injected once; subsequent renders are no-ops (same content).
+    if (isTRUE(getOption("teal.lazy_module_ui", FALSE))) {
+      args <- c(list(id = session$ns("module")), modules$ui_args)
+      .call_once_when(
+        identical(module_id, active_module_id()),
         output$lazy_ui <- renderUI(do.call(what = modules$ui, args = args, quote = TRUE))
-      }
+      )
+    }
 
+    .call_once_when(is_active(), {
       filtered_teal_data <- srv_filter_data(
         "filter_panel",
         datasets = datasets,
