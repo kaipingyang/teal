@@ -3,9 +3,11 @@
 # Prototype app demonstrating teal.lazy_module_ui = TRUE.
 # 24 real teal.modules.clinical modules using official tmc_ex_* data.
 #
-# After installing this fork of teal:
-#   options(teal.lazy_module_ui = TRUE)
-#   shiny::runApp(system.file("examples/lazy_module_ui/lazy_module_ui_demo.R", package = "teal"))
+# Run:
+#   shiny::runApp(
+#     system.file("examples/lazy_module_ui/lazy_module_ui_demo.R", package = "teal"),
+#     host = "0.0.0.0", port = 7778
+#   )
 #
 # Expected behavior:
 #   - Only the first active module renders its full UI at startup.
