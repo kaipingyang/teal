@@ -503,11 +503,36 @@ srv_teal_module <- function(id,
       args <- c(list(id = session$ns("module")), modules$ui_args)
       .call_once_when(
         identical(module_id, active_module_id()),
-        output$lazy_ui <- renderUI(do.call(what = modules$ui, args = args, quote = TRUE))
+        output$lazy_ui <- renderUI(
+          # Some module ui() functions invoke teal.transform helpers that require
+          # a Shiny session context or specific data_extract_spec arguments. If
+          # the call fails, fall back to a server-side renderUI approach: inject
+          # a nested uiOutput so the real UI can be sent once data is ready via
+          # the is_active() path in .call_once_when below.
+          tryCatch(
+            do.call(what = modules$ui, args = args, quote = TRUE),
+            error = function(e) {
+              logger::log_debug(
+                "lazy_module_ui: deferred ui() for '{deparse1(modules$label)}' ",
+                "(will render server-side when active): {conditionMessage(e)}"
+              )
+              # Server-side injection: output$lazy_ui_inner will be set in is_active() block
+              shiny::uiOutput(session$ns("lazy_ui_inner"))
+            }
+          )
+        )
       )
     }
 
     .call_once_when(is_active(), {
+      # If lazy_ui fell back to uiOutput("lazy_ui_inner"), inject the real UI now.
+      if (isTRUE(getOption("teal.lazy_module_ui", FALSE))) {
+        args <- c(list(id = session$ns("module")), modules$ui_args)
+        output$lazy_ui_inner <- renderUI(
+          do.call(what = modules$ui, args = args, quote = TRUE)
+        )
+      }
+
       filtered_teal_data <- srv_filter_data(
         "filter_panel",
         datasets = datasets,

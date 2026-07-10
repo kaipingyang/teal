@@ -55,7 +55,10 @@ data <- within(data, {
   ADLB  <- tmc_ex_adlb
   ADQS  <- tmc_ex_adqs
   ADMH  <- tmc_ex_admh
+  # ADCM: add CMASTDTM/CMAENDTM needed by tm_t_pp_prior_medication
   ADCM  <- tmc_ex_adcm
+  ADCM$CMASTDTM <- ADCM$ASTDTM
+  ADCM$CMAENDTM <- ADCM$AENDTM
   ADVS  <- tmc_ex_advs
 
   # ADCM needs self-join keys for tm_t_mult_events
@@ -232,6 +235,7 @@ mods <- modules(
       arm_var        = choices_selected(variable_choices(ADSL, c("ARM","ARMCD")), "ARM"),
       by_vars        = choices_selected(variable_choices(ADLB, c("PARAM","AVISIT")), "AVISIT"),
       summarize_vars = choices_selected(variable_choices(ADLB, c("AVAL","CHG")), "AVAL"),
+      id_var         = choices_selected(variable_choices(ADSL, "USUBJID"), "USUBJID"),
       paramcd        = choices_selected(value_choices(ADLB, "PARAMCD", "PARAM"), "ALT")
     )
   ),
@@ -261,7 +265,11 @@ mods <- modules(
       label       = "Prior Medication",
       dataname    = "ADCM",
       parentname  = "ADSL",
-      patient_col = "USUBJID"
+      patient_col = "USUBJID",
+      atirel      = choices_selected(variable_choices(ADCM, "ATIREL"),  "ATIREL"),
+      cmdecod     = choices_selected(variable_choices(ADCM, "CMDECOD"), "CMDECOD"),
+      cmindc      = choices_selected(variable_choices(ADCM, "CMINDC"),  "CMINDC"),
+      cmstdy      = choices_selected(variable_choices(ADCM, c("ASTDY","AENDY")), "ASTDY")
     ),
 
     tm_t_pp_laboratory(
