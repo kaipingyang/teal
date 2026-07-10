@@ -2,22 +2,11 @@
 #
 # Prototype app: teal.lazy_module_ui = TRUE with 24 clinical modules.
 #
-# Run from any R session (including ERP_TEST renv):
-#   pkgload::load_all("/usrfiles/shared-projects/users/kaiping_yang/teal")
-#   source("/usrfiles/shared-projects/users/kaiping_yang/teal/inst/examples/lazy_module_ui/lazy_module_ui_demo.R")
-#
-# Or via terminal:
-#   /opt/R/4.4.3/bin/Rscript \
-#     /usrfiles/shared-projects/users/kaiping_yang/teal/inst/examples/lazy_module_ui/lazy_module_ui_demo.R
+# Run from the teal fork directory:
+#   pkgload::load_all()   # or devtools::load_all()
+#   source("inst/examples/lazy_module_ui/lazy_module_ui_demo.R")
 
-FORK_DIR <- "/usrfiles/shared-projects/users/kaiping_yang/teal"
-ERP_LIB  <- "/mnt/usrfiles/bgcrh/support/sp_app/project/ERP_TEST/renv/library/linux-ubuntu-jammy/R-4.4/x86_64-pc-linux-gnu"
-
-# Load fork teal from source — overrides any renv-locked teal in current session
-if (!requireNamespace("pkgload", quietly = TRUE)) {
-  .libPaths(c(ERP_LIB, .libPaths()))
-}
-pkgload::load_all(FORK_DIR, quiet = TRUE)
+pkgload::load_all(quiet = TRUE)
 
 options(teal.lazy_module_ui = TRUE)
 
