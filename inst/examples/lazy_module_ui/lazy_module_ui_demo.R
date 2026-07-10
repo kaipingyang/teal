@@ -2,35 +2,26 @@
 #
 # Prototype app: teal.lazy_module_ui = TRUE with 24 clinical modules.
 #
-# MUST run via terminal (Rscript), NOT source() inside any R session:
+# Run from any R session (including ERP_TEST renv):
+#   pkgload::load_all("/usrfiles/shared-projects/users/kaiping_yang/teal")
+#   source("/usrfiles/shared-projects/users/kaiping_yang/teal/inst/examples/lazy_module_ui/lazy_module_ui_demo.R")
 #
+# Or via terminal:
 #   /opt/R/4.4.3/bin/Rscript \
 #     /usrfiles/shared-projects/users/kaiping_yang/teal/inst/examples/lazy_module_ui/lazy_module_ui_demo.R
-#
-# source() inside ERP_TEST or any renv session won't work — the already-attached
-# teal cannot be replaced by .libPaths() at runtime.
 
-FORK_LIB <- "/mnt/usrfiles/bgcrh/support/sp_app/project/ERP_TEST/tests/lazy_module_ui_prototype/lib"
+FORK_DIR <- "/usrfiles/shared-projects/users/kaiping_yang/teal"
 ERP_LIB  <- "/mnt/usrfiles/bgcrh/support/sp_app/project/ERP_TEST/renv/library/linux-ubuntu-jammy/R-4.4/x86_64-pc-linux-gnu"
 
-.libPaths(c(FORK_LIB, ERP_LIB, "/opt/R/4.4.3/lib/R/library"))
+# Load fork teal from source — overrides any renv-locked teal in current session
+if (!requireNamespace("pkgload", quietly = TRUE)) {
+  .libPaths(c(ERP_LIB, .libPaths()))
+}
+pkgload::load_all(FORK_DIR, quiet = TRUE)
 
 options(teal.lazy_module_ui = TRUE)
 
-library(teal)
 library(teal.modules.clinical)
-
-# Guard: fail fast with actionable message if wrong teal is loaded
-teal_path <- find.package("teal")
-if (!grepl("lazy_module_ui_prototype", teal_path)) {
-  stop(
-    "\nWrong teal loaded: ", teal_path,
-    "\n\nRun via terminal:\n",
-    "  /opt/R/4.4.3/bin/Rscript \\\n",
-    "    /usrfiles/shared-projects/users/kaiping_yang/teal/inst/examples/lazy_module_ui/lazy_module_ui_demo.R\n"
-  )
-}
-message("teal OK (fork): ", teal_path)
 
 # ---- Data (official tmc_ex_* — correct PARAMCD strings) -----------------
 ADSL  <- tmc_ex_adsl
