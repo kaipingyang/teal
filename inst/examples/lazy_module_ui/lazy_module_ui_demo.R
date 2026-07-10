@@ -3,21 +3,33 @@
 # Prototype app demonstrating teal.lazy_module_ui = TRUE.
 # 24 real teal.modules.clinical modules using official tmc_ex_* data.
 #
-# Run:
-#   shiny::runApp(
-#     system.file("examples/lazy_module_ui/lazy_module_ui_demo.R", package = "teal"),
-#     host = "0.0.0.0", port = 7778
-#   )
+# MUST be run via Rscript (not inside an active renv session):
 #
-# Expected behavior:
-#   - Only the first active module renders its full UI at startup.
-#   - Non-active module tabs contain a lightweight uiOutput placeholder.
-#   - Clicking any other module injects its UI on first activation.
+#   /opt/R/4.4.3/bin/Rscript \
+#     /usrfiles/shared-projects/users/kaiping_yang/teal/inst/examples/lazy_module_ui/lazy_module_ui_demo.R
+#
+# Running inside ERP_TEST renv will load the wrong teal — use Rscript above.
+
+FORK_LIB <- "/mnt/usrfiles/bgcrh/support/sp_app/project/ERP_TEST/tests/lazy_module_ui_prototype/lib"
+ERP_LIB  <- "/mnt/usrfiles/bgcrh/support/sp_app/project/ERP_TEST/renv/library/linux-ubuntu-jammy/R-4.4/x86_64-pc-linux-gnu"
+
+# Fork teal first so library(teal) picks up the lazy-module-ui version
+.libPaths(c(FORK_LIB, ERP_LIB, "/opt/R/4.4.3/lib/R/library"))
 
 options(teal.lazy_module_ui = TRUE)
 
 library(teal)
 library(teal.modules.clinical)
+
+# Verify fork loaded (must contain lazy_module_ui_prototype in path)
+teal_path <- find.package("teal")
+if (!grepl("lazy_module_ui_prototype", teal_path)) {
+  stop(
+    "Wrong teal loaded: ", teal_path,
+    "\nRun via Rscript, not inside an active renv session."
+  )
+}
+message("teal OK: ", teal_path)
 
 # ---- Data (official tmc_ex_* — correct PARAMCD strings) -----------------
 ADSL  <- tmc_ex_adsl
