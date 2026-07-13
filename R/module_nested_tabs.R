@@ -79,7 +79,15 @@ ui_teal_module <- function(id, modules) {
     unlist(modules_slot(modules, "path"), use.names = FALSE)[1]
   )
 
+  .ui_t0 <- proc.time()[["elapsed"]]
   module_items <- .ui_teal_module(id = ns("nav"), modules = modules, active_module_id = active_module_id)
+  .ui_elapsed <- round((proc.time()[["elapsed"]] - .ui_t0) * 1000)
+  n_mods <- length(unlist(modules_slot(modules, "label")))
+  lazy_on <- isTRUE(getOption("teal.lazy_module_ui", FALSE))
+  logger::log_info(
+    "ui_teal_module: built {n_mods} module(s) in {.ui_elapsed}ms ",
+    "[lazy_module_ui={lazy_on}]"
+  )
 
   tags$div(
     class = "teal-modules-wrapper",
@@ -514,7 +522,9 @@ srv_teal_module <- function(id,
       args <- c(list(id = session$ns("module")), modules$ui_args)
       .call_once_when(
         identical(module_id, active_module_id()),
-        output$lazy_ui <- renderUI(
+        {
+          .lazy_t0 <- proc.time()[["elapsed"]]
+          output$lazy_ui <- renderUI(
           # Some module ui() functions invoke teal.transform helpers that require
           # a Shiny session context or specific data_extract_spec arguments. If
           # the call fails, fall back to a server-side renderUI approach: inject
@@ -527,15 +537,24 @@ srv_teal_module <- function(id,
                 "lazy_module_ui: deferred ui() for '{deparse1(modules$label)}' ",
                 "(will render server-side when active): {conditionMessage(e)}"
               )
-              # Server-side injection: output$lazy_ui_inner will be set in is_active() block
               shiny::uiOutput(session$ns("lazy_ui_inner"))
             }
           )
+        )  # end renderUI
+        logger::log_info(
+          "lazy_module_ui: injected UI for '{deparse1(modules$label)}' in ",
+          "{round((proc.time()[['elapsed']] - .lazy_t0) * 1000)}ms (first activation)"
         )
-      )
-    }
+      }  # end handlerExpr block
+      )  # end .call_once_when
+    }  # end if(lazy)
 
     .call_once_when(is_active(), {
+      .active_t0 <- proc.time()[["elapsed"]]
+      logger::log_info(
+        "lazy_module_ui: module '{deparse1(modules$label)}' became active — ",
+        "starting server init [lazy={isTRUE(getOption('teal.lazy_module_ui', FALSE))}]"
+      )
       # If lazy_ui fell back to uiOutput("lazy_ui_inner"), inject the real UI now.
       if (isTRUE(getOption("teal.lazy_module_ui", FALSE))) {
         args <- c(list(id = session$ns("module")), modules$ui_args)
@@ -618,6 +637,10 @@ srv_teal_module <- function(id,
           srv_add_reporter("add_reporter_wrapper", module_out = out, reporter = reporter, module_label = modules$label)
           srv_source_code("source_code_wrapper", out)
           module_out(out)
+          logger::log_info(
+            "lazy_module_ui: module '{deparse1(modules$label)}' server init complete in ",
+            "{round((proc.time()[['elapsed']] - .active_t0) * 1000)}ms"
+          )
         }
       )
     })
