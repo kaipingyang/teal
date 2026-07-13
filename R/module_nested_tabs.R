@@ -251,7 +251,18 @@ srv_teal_module <- function(id,
     # Non-active modules: placeholder only; real UI injected server-side on first activation.
     uiOutput(ns("lazy_ui"))
   } else {
-    do.call(what = modules$ui, args = args, quote = TRUE)
+    # Some module ui() functions call teal.transform helpers (e.g. is_single_dataset)
+    # that fail without a full session context. Fall back to server-side injection.
+    tryCatch(
+      do.call(what = modules$ui, args = args, quote = TRUE),
+      error = function(e) {
+        logger::log_debug(
+          "lazy_module_ui: deferred ui() for '{deparse1(modules$label)}' ",
+          "(will render server-side when active): {conditionMessage(e)}"
+        )
+        uiOutput(ns("lazy_ui_inner"))
+      }
+    )
   }
 
   ui_teal <- tags$div(
