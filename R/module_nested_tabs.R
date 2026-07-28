@@ -571,17 +571,6 @@ srv_teal_module <- function(id,
             }
           )
         )
-        # After lazy_ui_inner flushes to the client, selectize controls initialise but
-        # Shiny does not automatically send their initial values back to the server
-        # (no "change" event fires if the value equals the pre-existing session value).
-        # Send a custom JS message that triggers selectize to report its current value,
-        # which re-invalidates any reactive blocked by req(input$population).
-        session$onFlushed(function() {
-          session$sendCustomMessage(
-            "teal-reinit-inputs",
-            list(ns = session$ns("module"))
-          )
-        }, once = TRUE)
       }
 
       filtered_teal_data <- srv_filter_data(
