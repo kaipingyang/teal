@@ -639,18 +639,38 @@ srv_teal_module <- function(id,
       })
 
       # Call modules.
+      # When lazy_ui is enabled, wait one extra flush after module_teal_data() becomes
+      # available so that lazy_ui_inner (injected above) reaches the client first.
+      # Without this, bgsrv_*() runs before selectInput/selectizeInput are in the DOM,
+      # and input$population / input$numeric_stats arrive as "" instead of their
+      # selected values — causing req(input$population) to stall forever.
       obs_module <- .call_once_when(
         !is.null(module_teal_data()),
         ignoreNULL = TRUE,
         handlerExpr = {
-          out <- .call_teal_module(modules, datasets, module_teal_data, reporter)
-          srv_add_reporter("add_reporter_wrapper", module_out = out, reporter = reporter, module_label = modules$label)
-          srv_source_code("source_code_wrapper", out)
-          module_out(out)
-          logger::log_info(
-            "lazy_module_ui: module '{modules$label}' server init complete in ",
-            "{round((proc.time()[['elapsed']] - .active_t0) * 1000)}ms"
-          )
+          if (lazy_ui_enabled) {
+            session$onFlushed(function() {
+              session$onFlushed(function() {
+                out <- .call_teal_module(modules, datasets, module_teal_data, reporter)
+                srv_add_reporter("add_reporter_wrapper", module_out = out, reporter = reporter, module_label = modules$label)
+                srv_source_code("source_code_wrapper", out)
+                module_out(out)
+                logger::log_info(
+                  "lazy_module_ui: module '{modules$label}' server init complete in ",
+                  "{round((proc.time()[['elapsed']] - .active_t0) * 1000)}ms"
+                )
+              }, once = TRUE)
+            }, once = TRUE)
+          } else {
+            out <- .call_teal_module(modules, datasets, module_teal_data, reporter)
+            srv_add_reporter("add_reporter_wrapper", module_out = out, reporter = reporter, module_label = modules$label)
+            srv_source_code("source_code_wrapper", out)
+            module_out(out)
+            logger::log_info(
+              "lazy_module_ui: module '{modules$label}' server init complete in ",
+              "{round((proc.time()[['elapsed']] - .active_t0) * 1000)}ms"
+            )
+          }
         }
       )
     })
