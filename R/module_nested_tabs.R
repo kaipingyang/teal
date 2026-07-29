@@ -556,9 +556,22 @@ srv_teal_module <- function(id,
         "lazy_module_ui: module '{modules$label}' became active — ",
         "starting server init [lazy={lazy_ui_enabled}]"
       )
-      # If lazy_ui fell back to uiOutput("lazy_ui_inner"), the real injection now
-      # happens inside .call_once_when(!is.null(module_teal_data())) below, so that
-      # data_extract_spec variable_choices can see the resolved datasets.
+      # If lazy_ui fell back to uiOutput("lazy_ui_inner"), inject the real UI now.
+      if (lazy_ui_enabled) {
+        ui_args <- c(list(id = session$ns("module")), modules$ui_args)
+        output$lazy_ui_inner <- renderUI(
+          tryCatch(
+            do.call(what = modules$ui, args = ui_args, quote = TRUE),
+            error = function(e) {
+              logger::log_warn(
+                "lazy_module_ui: ui() failed for '{modules$label}' even in is_active() context: ",
+                "{conditionMessage(e)}"
+              )
+              shiny::div()
+            }
+          )
+        )
+      }
 
       filtered_teal_data <- srv_filter_data(
         "filter_panel",
@@ -630,25 +643,6 @@ srv_teal_module <- function(id,
         !is.null(module_teal_data()),
         ignoreNULL = TRUE,
         handlerExpr = {
-          # Inject lazy_ui_inner here (not earlier) so that data_extract_spec's
-          # variable_choices has access to the resolved datasets. Injecting before
-          # module_teal_data() is ready causes delayed_variable_choices to see an
-          # empty dataset and produce no selectize options.
-          if (lazy_ui_enabled) {
-            ui_args <- c(list(id = session$ns("module")), modules$ui_args)
-            output$lazy_ui_inner <- renderUI(
-              tryCatch(
-                do.call(what = modules$ui, args = ui_args, quote = TRUE),
-                error = function(e) {
-                  logger::log_warn(
-                    "lazy_module_ui: ui() failed for '{modules$label}' even after data ready: ",
-                    "{conditionMessage(e)}"
-                  )
-                  shiny::div()
-                }
-              )
-            )
-          }
           out <- .call_teal_module(modules, datasets, module_teal_data, reporter)
           srv_add_reporter("add_reporter_wrapper", module_out = out, reporter = reporter, module_label = modules$label)
           srv_source_code("source_code_wrapper", out)
