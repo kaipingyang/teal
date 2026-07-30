@@ -546,24 +546,28 @@ srv_teal_module <- function(id,
         {
           output$lazy_ui <- renderUI({
             .lazy_t0 <- proc.time()[["elapsed"]]
+            # Try direct UI first. If successful (eager path), attach ready_script so
+            # the binding handshake fires for ALL modules including the initial eager one.
+            # If it fails (fallback path), return lazy_ui_inner placeholder WITHOUT ready_script:
+            # the inner UI will send its own ready signal when it actually renders.
             result <- tryCatch(
-              do.call(what = modules$ui, args = ui_args, quote = TRUE),
+              tagList(
+                do.call(what = modules$ui, args = ui_args, quote = TRUE),
+                ready_script   # only attached on success
+              ),
               error = function(e) {
                 logger::log_debug(
                   "lazy_module_ui: deferred ui() for '{modules$label}' ",
                   "(will render server-side when active): {conditionMessage(e)}"
                 )
-                shiny::uiOutput(session$ns("lazy_ui_inner"))
+                shiny::uiOutput(session$ns("lazy_ui_inner"))  # no ready_script here
               }
             )
             logger::log_info(
               "lazy_module_ui: injected UI for '{modules$label}' in ",
               "{round((proc.time()[['elapsed']] - .lazy_t0) * 1000)}ms (first activation)"
             )
-            # Attach ready_script regardless of which path succeeded:
-            # direct UI or fallback placeholder. For fallback, lazy_ui_inner
-            # will send its own ready signal when it renders.
-            tagList(result, ready_script)
+            result
           })
         }
       )
