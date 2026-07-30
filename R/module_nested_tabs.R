@@ -557,13 +557,40 @@ srv_teal_module <- function(id,
         "starting server init [lazy={lazy_ui_enabled}]"
       )
       # If lazy_ui fell back to uiOutput("lazy_ui_inner"), inject the real UI now.
+      # After injection, embed a JS snippet that waits for Shiny.bindAll() to complete
+      # (confirmed via shiny:bound events) before signalling lazy_ui_ready back to server.
+      # This ensures .call_teal_module() only fires after browser input bindings are live,
+      # preventing data_extract_multiple_srv() choices/selected from arriving before DOM is ready.
       if (lazy_ui_enabled) {
         ui_args <- c(list(id = session$ns("module")), modules$ui_args)
+        lazy_ready_id <- session$ns("lazy_ui_ready")
         output$lazy_ui_inner <- renderUI(
           tryCatch(
-            do.call(what = modules$ui, args = ui_args, quote = TRUE),
+            tagList(
+              do.call(what = modules$ui, args = ui_args, quote = TRUE),
+              # Explicit client-side ready acknowledgement:
+              # After the module UI HTML is inserted, use requestAnimationFrame
+              # to confirm Shiny.bindAll() has completed, then signal the server.
+              tags$script(HTML(paste0(
+                "(function() {",
+                "  var ns = ", shQuote(session$ns("")), ";",
+                "  var readyId = ", shQuote(lazy_ready_id), ";",
+                "  var nonce = Date.now();",
+                "  function sendReady() {",
+                "    if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {",
+                "      Shiny.setInputValue(readyId, nonce, {priority: 'event'});",
+                "    }",
+                "  }",
+                "  // requestAnimationFrame ensures DOM paint + bindAll have completed",
+                "  if (typeof requestAnimationFrame !== 'undefined') {",
+                "    requestAnimationFrame(function() { requestAnimationFrame(sendReady); });",
+                "  } else {",
+                "    setTimeout(sendReady, 0);",
+                "  }",
+                "})()"
+              )))
+            ),
             error = function(e) {
-              # Use message() so error appears in R console and Connect job log
               message(sprintf(
                 "[LAZY_UI_INNER_FAILED] '%s': %s",
                 modules$label, conditionMessage(e)
@@ -640,8 +667,16 @@ srv_teal_module <- function(id,
       })
 
       # Call modules.
+      # When lazy_ui_enabled: gate on BOTH lazy_ui_ready (client confirmed Shiny.bindAll()
+      # complete) AND module_teal_data ready. This prevents data_extract_multiple_srv()
+      # from sending choices/selected/validation before browser inputs are bound.
+      # When not lazy: original behaviour — gate only on module_teal_data.
       obs_module <- .call_once_when(
-        !is.null(module_teal_data()),
+        {
+          data_ready <- !is.null(module_teal_data())
+          ui_ready   <- if (lazy_ui_enabled) isTRUE(input[[lazy_ready_id]]) else TRUE
+          data_ready && ui_ready
+        },
         ignoreNULL = TRUE,
         handlerExpr = {
           out <- .call_teal_module(modules, datasets, module_teal_data, reporter)
