@@ -260,21 +260,32 @@ srv_teal_module <- function(id,
     uiOutput(ns("lazy_ui"))
   } else {
     # Active (eager) module: build real UI immediately.
-    # Attach ready_script on success so the server-side binding gate is released.
-    # Fallback to lazy_ui_inner placeholder WITHOUT ready_script; inner will send ready.
+    # ready_script_ui is injected into static HTML, so Shiny connection may not exist yet.
+    # Must wait for shiny:connected before calling Shiny.setInputValue().
+    # Dynamic renderUI paths (non-eager) run after connection is established, so they
+    # can use double-rAF directly. The eager path needs the shiny:connected guard.
     ready_id <- ns("lazy_ui_ready")
     ready_script_ui <- tags$script(HTML(paste0(
       "(function() {",
       "  var readyId = ", shQuote(ready_id), ";",
-      "  function sendReady() {",
-      "    if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {",
-      "      Shiny.setInputValue(readyId, true, {priority: 'event'});",
-      "    }",
+      "  function scheduleReady() {",
+      "    requestAnimationFrame(function() {",
+      "      requestAnimationFrame(function() {",
+      "        if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {",
+      "          Shiny.setInputValue(readyId, true, {priority: 'event'});",
+      "        }",
+      "      });",
+      "    });",
       "  }",
-      "  if (typeof requestAnimationFrame !== 'undefined') {",
-      "    requestAnimationFrame(function() { requestAnimationFrame(sendReady); });",
+      "  // In static HTML Shiny connection may not exist yet; wait for it.",
+      "  if (",
+      "    typeof Shiny !== 'undefined' &&",
+      "    Shiny.shinyapp && Shiny.shinyapp.$socket &&",
+      "    Shiny.shinyapp.$socket.readyState === 1",
+      "  ) {",
+      "    scheduleReady();",
       "  } else {",
-      "    setTimeout(sendReady, 0);",
+      "    $(document).one('shiny:connected', scheduleReady);",
       "  }",
       "})()"
     )))
