@@ -259,16 +259,36 @@ srv_teal_module <- function(id,
     # Non-active modules: placeholder only; real UI injected server-side on first activation.
     uiOutput(ns("lazy_ui"))
   } else {
-    # Some module ui() functions call teal.transform helpers (e.g. is_single_dataset)
-    # that fail without a full session context. Fall back to server-side injection.
+    # Active (eager) module: build real UI immediately.
+    # Attach ready_script on success so the server-side binding gate is released.
+    # Fallback to lazy_ui_inner placeholder WITHOUT ready_script; inner will send ready.
+    ready_id <- ns("lazy_ui_ready")
+    ready_script_ui <- tags$script(HTML(paste0(
+      "(function() {",
+      "  var readyId = ", shQuote(ready_id), ";",
+      "  function sendReady() {",
+      "    if (typeof Shiny !== 'undefined' && Shiny.setInputValue) {",
+      "      Shiny.setInputValue(readyId, true, {priority: 'event'});",
+      "    }",
+      "  }",
+      "  if (typeof requestAnimationFrame !== 'undefined') {",
+      "    requestAnimationFrame(function() { requestAnimationFrame(sendReady); });",
+      "  } else {",
+      "    setTimeout(sendReady, 0);",
+      "  }",
+      "})()"
+    )))
     tryCatch(
-      do.call(what = modules$ui, args = args, quote = TRUE),
+      tagList(
+        do.call(what = modules$ui, args = args, quote = TRUE),
+        ready_script_ui  # only on success
+      ),
       error = function(e) {
         logger::log_debug(
           "lazy_module_ui: deferred ui() for '{modules$label}' ",
           "(will render server-side when active): {conditionMessage(e)}"
         )
-        uiOutput(ns("lazy_ui_inner"))
+        uiOutput(ns("lazy_ui_inner"))  # no ready_script; inner sends its own
       }
     )
   }
