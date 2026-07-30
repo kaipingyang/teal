@@ -563,10 +563,11 @@ srv_teal_module <- function(id,
           tryCatch(
             do.call(what = modules$ui, args = ui_args, quote = TRUE),
             error = function(e) {
-              logger::log_warn(
-                "lazy_module_ui: ui() failed for '{modules$label}' even in is_active() context: ",
-                "{conditionMessage(e)}"
-              )
+              # Use message() so error appears in R console and Connect job log
+              message(sprintf(
+                "[LAZY_UI_INNER_FAILED] '%s': %s",
+                modules$label, conditionMessage(e)
+              ))
               shiny::div()
             }
           )
